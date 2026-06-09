@@ -16,6 +16,8 @@ This guide is structured for **all experience levels**:
 
 **How to learn from it:** Read a section, then do the exercises before moving on. Passive reading is not enough for C++.
 
+**Reference solutions:** Worked solutions for every exercise live in the [`solutions/`](solutions/) directory, with comments explaining the *why* behind each design choice. Attempt the exercise first — then use the solutions to check your work or get unstuck.
+
 **Three sites to bookmark right now — use them throughout every phase:**
 
 - [learncpp.com](https://www.learncpp.com) — Best free tutorial; modern C++ from the start
