@@ -1,0 +1,6 @@
+# phase6_modern_cpp/CMakeLists.txt
+
+add_subdirectory(ex1_smart_pointers)
+add_subdirectory(ex2_move_semantics)
+add_subdirectory(ex3_lambda_adder)
+add_subdirectory(ex4_perfect_forwarding)

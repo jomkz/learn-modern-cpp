@@ -1,0 +1,12 @@
+# .clangd — configuration for the clangd language server (IDE integration).
+# This file is read by clangd, NOT by the CMake build. Changes here affect
+# IDE diagnostics only; the actual compiler (GCC) is unaffected.
+
+Diagnostics:
+  Suppress:
+    # Clang 22+ warns about __COUNTER__ under -Wpedantic because it isn't in
+    # the C++ standard yet (it's a well-supported GCC/Clang extension). Catch2
+    # uses __COUNTER__ inside its TEST_CASE / SECTION macros, producing spurious
+    # errors on every test file. Suppress the diagnostic — __COUNTER__ works
+    # correctly on every compiler we support and the build is clean.
+    - c2y-extensions

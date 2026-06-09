@@ -1,0 +1,7 @@
+# phase5_templates/CMakeLists.txt
+
+add_subdirectory(ex1_clamp)
+add_subdirectory(ex2_typed_stack)
+add_subdirectory(ex3_variadic_print)
+add_subdirectory(ex4_constexpr_fibonacci)
+add_subdirectory(ex5_if_constexpr_process)

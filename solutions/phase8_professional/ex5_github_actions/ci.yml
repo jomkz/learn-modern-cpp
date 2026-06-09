@@ -1,0 +1,140 @@
+# Phase 8, Exercise 5 — GitHub Actions CI Workflow
+# Concept: Multi-platform CI/CD with build matrix, unit tests, and ASan.
+# Demonstrates: matrix strategy, CMake in CI, ctest, AddressSanitizer job.
+#
+# To use this file in your project:
+#   1. Create the directory .github/workflows/ at your repo root.
+#   2. Copy this file there as ci.yml.
+#   3. Push to GitHub — Actions runs automatically on push to 'main'.
+#
+# What this workflow does on every push/PR to main:
+#   - Matrix job: builds and tests on Linux (GCC), macOS (LLVM Clang), Windows (MSVC).
+#   - ASan job: builds with -DENABLE_ASAN=ON on Linux and runs tests.
+
+name: CI
+
+# ── Trigger ───────────────────────────────────────────────────────────────────
+# Run on every push to main and on every pull request targeting main.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# ── Build Matrix ──────────────────────────────────────────────────────────────
+# Three OS/compiler combinations tested in parallel.
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }} / ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false  # don't cancel other jobs if one fails; see all failures
+      matrix:
+        include:
+          # ── Linux / GCC ────────────────────────────────────────────────────
+          - os: ubuntu-latest
+            compiler: GCC
+            cc: gcc-13
+            cxx: g++-13
+            extra_packages: g++-13 libtbb-dev
+
+          # ── macOS / LLVM Clang ─────────────────────────────────────────────
+          # Homebrew LLVM is used instead of Apple Clang, which lags C++20/23 support.
+          - os: macos-latest
+            compiler: Clang
+            cc: $(brew --prefix llvm)/bin/clang
+            cxx: $(brew --prefix llvm)/bin/clang++
+            extra_packages: llvm
+
+          # ── Windows / MSVC ─────────────────────────────────────────────────
+          # Visual Studio 2022 is pre-installed on windows-latest.
+          # The MSVC compiler is activated by the Developer Command Prompt step.
+          - os: windows-latest
+            compiler: MSVC
+            cc: cl
+            cxx: cl
+            extra_packages: ""
+
+    steps:
+      # 1. Checkout the repository (shallow clone for speed).
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Install dependencies (Linux).
+      - name: Install packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y cmake ${{ matrix.extra_packages }}
+
+      # 3. Install dependencies (macOS).
+      - name: Install packages (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ${{ matrix.extra_packages }}
+
+      # 4. Configure CMake.
+      # On Windows we don't set CC/CXX — CMake finds MSVC automatically when
+      # run from the Visual Studio Developer Command Prompt (activated by
+      # actions/setup-msvc or the windows-latest runner).
+      - name: Configure (Linux/macOS)
+        if: runner.os != 'Windows'
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -B build \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_STANDARD=20
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20
+
+      # 5. Build all targets.
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      # 6. Run tests with CTest. --output-on-failure prints test output only
+      #    when a test fails, keeping the log clean for passing runs.
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --build-config Release
+
+  # ── ASan Job (Linux only) ─────────────────────────────────────────────────────
+  # AddressSanitizer + UBSan catch memory errors that don't manifest in Release.
+  # Run on Linux with GCC (ASan is most mature on Linux).
+  asan:
+    name: ASan + UBSan (Linux/GCC)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y cmake g++-13 libtbb-dev
+
+      - name: Configure with ASan
+        env:
+          CC: gcc-13
+          CXX: g++-13
+        run: |
+          cmake -B build-asan \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_CXX_STANDARD=20 \
+                -DENABLE_ASAN=ON
+
+      - name: Build
+        run: cmake --build build-asan --parallel
+
+      - name: Test under ASan
+        # ASAN_OPTIONS: abort_on_error=1 causes a non-zero exit on first error,
+        #               so ctest correctly marks the test as failed.
+        env:
+          ASAN_OPTIONS: abort_on_error=1:detect_leaks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build-asan --output-on-failure

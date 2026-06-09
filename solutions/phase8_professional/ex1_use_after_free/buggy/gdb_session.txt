@@ -1,0 +1,92 @@
+GDB Session Transcript — Phase 8, Exercise 1 (Use-After-Free)
+=============================================================
+
+Build command:
+  cmake -B build -DCMAKE_BUILD_TYPE=Debug
+  cmake --build build
+
+Start GDB:
+  gdb ./build/phase8_professional/ex1_use_after_free/ph8_ex1_buggy
+
+──────────────────────────────────────────────────────────────────────────────
+(gdb) run
+──────────────────────────────────────────────────────────────────────────────
+
+Starting program: .../ph8_ex1_buggy
+
+Allocated Foo at 0x55f3a2c012b0
+Freed Foo
+value = 42            ← (appears to work — UB is sneaky, memory not yet reused)
+
+[Inferior 1 (process 12345) exited normally with code 0]
+
+NOTE: The program may exit "successfully" here because the freed memory hasn't
+been reused by the allocator yet. This is why UAF is dangerous — it silently
+corrupts data in production when memory IS reused. Run with ASan to catch it:
+
+──────────────────────────────────────────────────────────────────────────────
+$ ./build-asan/phase8_professional/ex1_use_after_free/ph8_ex1_buggy
+──────────────────────────────────────────────────────────────────────────────
+
+Allocated Foo at 0x602000000010
+Freed Foo
+=================================================================
+==12345==ERROR: AddressSanitizer: heap-use-after-free on address 0x602000000010
+  at pc 0x5555555561a3 bp 0x7fffffffe180 sp 0x7fffffffe178
+
+READ of size 4 at 0x602000000010 thread T0
+    #0 0x5555555561a0 in use_foo(Foo*) buggy/main.cpp:48    ← EXACT LINE
+    #1 0x555555556205 in main        buggy/main.cpp:60
+    #2 0x7ffff7a7dd0a in __libc_start_main (...)
+    #3 0x5555555560d9 in _start
+
+0x602000000010 is located 0 bytes inside of 4-byte region
+[0x602000000010, 0x602000000014)
+freed by thread T0 here:
+    #0 0x7ffff7c6f3cf in operator delete(void*, unsigned long) (...)
+    #1 0x5555555561eb in main buggy/main.cpp:56              ← WHERE IT WAS FREED
+    #2 0x7ffff7a7dd0a in __libc_start_main (...)
+
+──────────────────────────────────────────────────────────────────────────────
+GDB with forced crash (allocate + free + re-allocate to poison the slot):
+──────────────────────────────────────────────────────────────────────────────
+
+To force a GDB-visible crash, run the program with a small allocator that
+reuses memory immediately, or use valgrind:
+
+  valgrind --tool=memcheck ./ph8_ex1_buggy
+
+Valgrind output (Linux only):
+  ==12345== Invalid read of size 4
+  ==12345==    at 0x10923A: use_foo(Foo*) (buggy/main.cpp:48)
+  ==12345==    by 0x109285: main (buggy/main.cpp:60)
+  ==12345==  Address 0x4e4bc80 is 0 bytes inside a block of size 4 free'd
+  ==12345==    at 0x4C34D00: operator delete(void*, unsigned long) (...)
+  ==12345==    by 0x10927A: main (buggy/main.cpp:56)
+
+──────────────────────────────────────────────────────────────────────────────
+Annotated GDB commands reference
+──────────────────────────────────────────────────────────────────────────────
+
+(gdb) run                   — start the program
+(gdb) backtrace             — (bt) show the full call stack when crashed
+(gdb) frame 0               — switch to frame 0 (innermost = crash site)
+(gdb) info locals           — print all local variables in current frame
+(gdb) up                    — move up one frame in the call stack
+(gdb) down                  — move down one frame
+(gdb) print ptr             — print the value of 'ptr'
+(gdb) print ptr->value      — print a field of the pointed-to object
+(gdb) x/4xb ptr             — examine 4 raw bytes at ptr's address in hex
+(gdb) break use_foo         — set a breakpoint on function entry
+(gdb) continue              — (c) resume execution after a breakpoint
+(gdb) next                  — (n) step over (don't enter function calls)
+(gdb) step                  — (s) step into (enter function calls)
+(gdb) quit                  — (q) exit GDB
+
+──────────────────────────────────────────────────────────────────────────────
+Fix
+──────────────────────────────────────────────────────────────────────────────
+
+See fixed/main.cpp. The fix uses std::unique_ptr<Foo> so the object is
+automatically destroyed and the pointer is nulled — making accidental reuse
+a null dereference (caught immediately) rather than silent UAF.

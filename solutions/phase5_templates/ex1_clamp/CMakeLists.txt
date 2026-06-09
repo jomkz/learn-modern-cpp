@@ -1,0 +1,7 @@
+add_executable(ph5_ex1_tests test_clamp.cpp)
+target_include_directories(ph5_ex1_tests PRIVATE .)
+target_link_libraries(ph5_ex1_tests PRIVATE Catch2::Catch2WithMain)
+target_enable_warnings(ph5_ex1_tests)
+include(CTest)
+include(Catch)
+catch_discover_tests(ph5_ex1_tests)

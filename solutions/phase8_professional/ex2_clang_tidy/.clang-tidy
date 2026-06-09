@@ -1,0 +1,25 @@
+# phase8_professional/ex2_clang_tidy/.clang-tidy
+# clang-tidy configuration for the ex2_clang_tidy exercise.
+#
+# Run: clang-tidy --config-file=.clang-tidy before/legacy_code.cpp -- -std=c++20
+# Or configure CMake: cmake -DCMAKE_CXX_CLANG_TIDY="clang-tidy" ..
+#
+# check groups:
+#   modernize-*            — modernise old C++ patterns (use nullptr, override, etc.)
+#   cppcoreguidelines-*    — C++ Core Guidelines enforcement
+#   readability-*          — code clarity checks
+#   performance-*          — flag common performance issues
+
+Checks: >
+  modernize-*,
+  cppcoreguidelines-*,
+  readability-*,
+  performance-*,
+  -modernize-use-trailing-return-type,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -cppcoreguidelines-pro-type-reinterpret-cast
+
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
+FormatStyle: none

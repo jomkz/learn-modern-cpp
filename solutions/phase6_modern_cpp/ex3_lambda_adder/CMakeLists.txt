@@ -1,0 +1,7 @@
+add_executable(ph6_ex3_tests test_adder.cpp)
+target_include_directories(ph6_ex3_tests PRIVATE .)
+target_link_libraries(ph6_ex3_tests PRIVATE Catch2::Catch2WithMain)
+target_enable_warnings(ph6_ex3_tests)
+include(CTest)
+include(Catch)
+catch_discover_tests(ph6_ex3_tests)

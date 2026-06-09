@@ -1,0 +1,7 @@
+add_executable(ph7_ex2_tests test_pipeline.cpp)
+target_include_directories(ph7_ex2_tests PRIVATE .)
+target_link_libraries(ph7_ex2_tests PRIVATE Catch2::Catch2WithMain)
+target_enable_warnings(ph7_ex2_tests)
+include(CTest)
+include(Catch)
+catch_discover_tests(ph7_ex2_tests)
